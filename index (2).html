@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Laboratório Interativo HMAC-SHA256 — Cibersegurança</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #060b13;
+      --surface: #0c1524;
+      --surface-card: #101c2e;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(255, 255, 255, 0.2);
+      
+      --text-main: #f0f4f9;
+      --text-muted: #8b9bb4;
+      
+      --cyan: #38bdf8;
+      --green: #10b981;
+      --green-glow: rgba(16, 185, 129, 0.25);
+      --red: #f43f5e;
+      --red-glow: rgba(244, 63, 94, 0.25);
+      --amber: #f59e0b;
+      --blue: #3b82f6;
+      --purple: #8b5cf6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(139, 92, 246, 0.05) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    .shell {
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: 32px 24px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      flex: 1;
+    }
+
+    /* Top Progress Stepper */
+    .stepper {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      position: relative;
+    }
+
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      backdrop-filter: blur(12px);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .step-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 4px;
+    }
+
+    .step-card.store-step::before { background: var(--green); }
+    .step-card.attack-step::before { background: var(--red); }
+    .step-card.server-step::before { background: var(--blue); }
+
+    .step-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 15px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .store-step .step-num { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 12px var(--green-glow); }
+    .attack-step .step-num { background: linear-gradient(135deg, #f43f5e, #be123c); box-shadow: 0 4px 12px var(--red-glow); }
+    .server-step .step-num { background: linear-gradient(135deg, #3b82f6, #1d4ed8); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+
+    .step-info h3 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+
+    .step-info p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Main Grid Panels */
+    .panels {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.5);
+      position: relative;
+    }
+
+    .panel.store { border-top: 2px solid var(--green); }
+    .panel.attack { border-top: 2px solid var(--red); }
+    .panel.server { border-top: 2px solid var(--blue); }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .panel-icon {
+      font-size: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .panel-title h2 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .status-badge {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .status-badge.active-red {
+      color: #fda4af;
+      background: rgba(244, 63, 94, 0.12);
+      border-color: rgba(244, 63, 94, 0.4);
+    }
+
+    /* Store Panel Custom Components */
+    .balance-card {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .balance-card span {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .balance-pill {
+      font-weight: 800;
+      color: #fda4af;
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 15px;
+      letter-spacing: -0.2px;
+    }
+
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .product-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .product-card:hover {
+      border-color: var(--border-focus);
+      transform: translateY(-2px);
+    }
+
+    .product-card.selected {
+      border-color: var(--green);
+      background: linear-gradient(145deg, rgba(16, 185, 129, 0.08), var(--surface-card));
+      box-shadow: 0 0 0 1px var(--green);
+    }
+
+    .product-icon {
+      height: 116px;
+      border-radius: 10px;
+      background: #172336;
+      overflow: hidden;
+    }
+    .product-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .panel-icon svg {
+      width: 21px;
+      height: 21px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .product-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .product-price {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+
+    .btn-buy {
+      margin-top: 6px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 9px;
+      cursor: pointer;
+      box-shadow: 0 3px 8px var(--green-glow);
+      transition: all 0.2s ease;
+    }
+
+    .btn-buy:hover:not(:disabled) {
+      filter: brightness(1.1);
+      box-shadow: 0 5px 14px var(--green-glow);
+    }
+
+    /* Forms, Codeblocks & Textareas */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .code-display, textarea {
+      font-family: 'Fira Code', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      background: #080f18;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #cbd5e1;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 1px var(--cyan);
+    }
+
+    .code-display {
+      min-height: 80px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .code-display.empty {
+      color: #475569;
+      font-style: italic;
+    }
+
+    .key { color: var(--cyan); }
+    .str { color: #fde047; }
+
+    .hash-box {
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      background: #080f18;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #94a3b8;
+      word-break: break-all;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+    }
+
+    /* Action Buttons */
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+      box-shadow: none !important;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--border-focus);
+    }
+
+    .btn-attack {
+      background: linear-gradient(135deg, #f43f5e, #be123c);
+      color: white;
+      box-shadow: 0 4px 14px var(--red-glow);
+    }
+
+    .btn-attack:hover:not(:disabled) {
+      filter: brightness(1.1);
+      box-shadow: 0 6px 20px var(--red-glow);
+    }
+
+    .btn-server {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-server:hover:not(:disabled) {
+      filter: brightness(1.1);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Result Notification */
+    .result-banner {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.02);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .result-banner strong {
+      display: block;
+      font-size: 15px;
+      margin-bottom: 2px;
+    }
+
+    .result-banner.error {
+      border-color: var(--red);
+      background: rgba(244, 63, 94, 0.1);
+    }
+
+    .result-banner.error strong { color: #fda4af; }
+
+    .result-banner.ok {
+      border-color: var(--green);
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    .result-banner.ok strong { color: #6ee7b7; }
+
+    /* Interactive Terminal */
+    .terminal-window {
+      margin-top: auto;
+      background: #050910;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 200px;
+    }
+
+    .terminal-bar {
+      background: #09101b;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .term-dots {
+      display: flex;
+      gap: 5px;
+    }
+
+    .term-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #334155;
+    }
+
+    .term-logs {
+      padding: 12px;
+      overflow-y: auto;
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .log-line { display: block; word-break: break-all; }
+    .t-time { color: #475569; margin-right: 6px; }
+    .t-warn { color: #fde047; }
+    .t-bad { color: #fda4af; }
+    .t-good { color: #6ee7b7; }
+    .t-muted { color: #64748b; }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 12px 0 4px;
+    }
+
+    @media (max-width: 1200px) {
+      .panels { grid-template-columns: 1fr; }
+      .stepper { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <main class="shell">
+    
+    <!-- Top Step Guide -->
+    <div class="stepper">
+      <div class="step-card store-step">
+        <div class="step-num">1</div>
+        <div class="step-info">
+          <h3>Loja Virtual (Cliente)</h3>
+          <p>Geração do pedido e assinatura HMAC</p>
+        </div>
+      </div>
+      <div class="step-card attack-step">
+        <div class="step-num">2</div>
+        <div class="step-info">
+          <h3>Interceptador (MitM)</h3>
+          <p>Alteração fraudulenta do conteúdo</p>
+        </div>
+      </div>
+      <div class="step-card server-step">
+        <div class="step-num">3</div>
+        <div class="step-info">
+          <h3>Servidor (Validação)</h3>
+          <p>Comparação criptográfica do hash</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Working Interface -->
+    <div class="panels">
+
+      <!-- Panel 1: Store -->
+      <section class="panel store">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="panel-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l1 12H4L5 8Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg></span>
+            <h2>Loja Aurora</h2>
+          </div>
+          <span class="status-badge">Origem</span>
+        </div>
+
+        <div class="balance-card">
+          <span>Saldo em Carteira</span>
+          <div class="balance-pill">R$ 0,00</div>
+        </div>
+
+        <div class="products-grid">
+          <div class="product-card selected" id="p0">
+            <div class="product-icon"><img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=460&q=85" alt="Headphones Pro" loading="lazy" referrerpolicy="no-referrer"></div>
+            <div class="product-name">Headphones Pro</div>
+            <div class="product-price">R$ 100,00</div>
+            <button class="btn-buy" data-index="0">Comprar</button>
+          </div>
+          <div class="product-card" id="p1">
+            <div class="product-icon"><img src="https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=460&q=85" alt="Teclado mecânico" loading="lazy" referrerpolicy="no-referrer"></div>
+            <div class="product-name">Teclado Mecânico</div>
+            <div class="product-price">R$ 250,00</div>
+            <button class="btn-buy" data-index="1">Comprar</button>
+          </div>
+          <div class="product-card" id="p2">
+            <div class="product-icon"><img src="https://images.unsplash.com/photo-1527814050087-3793815479db?auto=format&fit=crop&w=460&q=85" alt="Mouse sem fios" loading="lazy" referrerpolicy="no-referrer"></div>
+            <div class="product-name">Mouse Sem Fios</div>
+            <div class="product-price">R$ 150,00</div>
+            <button class="btn-buy" data-index="2">Comprar</button>
+          </div>
+          <div class="product-card" id="p3">
+            <div class="product-icon"><img src="https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=460&q=85" alt="Monitor" loading="lazy" referrerpolicy="no-referrer"></div>
+            <div class="product-name">Monitor 4K</div>
+            <div class="product-price">R$ 799,00</div>
+            <button class="btn-buy" data-index="3">Comprar</button>
+          </div>
+        </div>
+
+        <div class="terminal-window">
+          <div class="terminal-bar">
+            <div class="term-dots">
+              <span class="term-dot"></span>
+              <span class="term-dot"></span>
+              <span class="term-dot"></span>
+            </div>
+            <span>client.log</span>
+          </div>
+          <div class="term-logs" id="clientLogs"></div>
+        </div>
+      </section>
+
+      <!-- Panel 2: Attack -->
+      <section class="panel attack">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="panel-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 10-12h-7l0-8Z"/></svg></span>
+            <h2>Interceptador Proxy</h2>
+          </div>
+          <span class="status-badge" id="captureBadge">Aguardando tráfego</span>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Payload original em trânsito</label>
+          <div class="code-display empty" id="original">Efetue uma compra para capturar...</div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="editor">Adulteração do Payload (Atacante)</label>
+          <textarea id="editor" spellcheck="false" disabled placeholder="O tráfego capturado aparecerá aqui para edição..."></textarea>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Assinatura HMAC-SHA256 capturada</label>
+          <div class="hash-box" id="signature">—</div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-secondary" id="tamper" disabled>Forjar Aprovação</button>
+          <button class="btn btn-secondary" id="restore" disabled>Restaurar</button>
+        </div>
+
+        <button class="btn btn-attack" id="forward" disabled>Encaminhar ao Servidor →</button>
+
+        <div class="terminal-window">
+          <div class="terminal-bar">
+            <div class="term-dots">
+              <span class="term-dot"></span>
+              <span class="term-dot"></span>
+              <span class="term-dot"></span>
+            </div>
+            <span>mitm_proxy.log</span>
+          </div>
+          <div class="term-logs" id="attackerLogs"></div>
+        </div>
+      </section>
+
+      <!-- Panel 3: Server -->
+      <section class="panel server">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="panel-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <h2>Servidor de Destino</h2>
+          </div>
+          <span class="status-badge">Verificador</span>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Payload recebido</label>
+          <div class="code-display empty" id="received">Aguardando envio pelo proxy...</div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">HMAC recebido</label>
+          <div class="hash-box" id="receivedSig">—</div>
+        </div>
+
+        <button class="btn btn-server" id="validate" disabled>Validar Assinatura HMAC</button>
+
+        <div class="result-banner" id="result">
+          <strong>Aguardando dados</strong>
+          Envie o payload interceptado para acionar a conferência local do hash.
+        </div>
+
+        <div class="terminal-window">
+          <div class="terminal-bar">
+            <div class="term-dots">
+              <span class="term-dot"></span>
+              <span class="term-dot"></span>
+              <span class="term-dot"></span>
+            </div>
+            <span>server_daemon.log</span>
+          </div>
+          <div class="term-logs" id="serverLogs"></div>
+        </div>
+      </section>
+
+    </div>
+
+    <footer class="footer">
+      Ambiente de demonstração criptográfica · HMAC-SHA256 nativo via Web Crypto API
+    </footer>
+  </main>
+
+  <script>
+  (() => {
+    'use strict';
+
+    const $ = id => document.getElementById(id);
+    const products = [
+      ['Headphones Pro', 100],
+      ['Teclado Mecânico', 250],
+      ['Mouse Sem Fios', 150],
+      ['Monitor 4K', 799]
+    ];
+    const SECRET = 'chave-secreta-compartilhada-2026';
+    let key = null;
+    let originalPayload = '';
+    let originalSig = '';
+    let receivedPayload = '';
+    let receivedSig = '';
+    let order = 2048;
+    let busy = false;
+
+    const enc = new TextEncoder();
+    const stamp = () => new Date().toLocaleTimeString('pt-PT', { hour12: false });
+
+    function log(id, message, cls = '') {
+      const el = document.createElement('span');
+      el.className = 'log-line';
+      
+      const t = document.createElement('span');
+      t.className = 't-time';
+      t.textContent = '[' + stamp() + ']';
+      
+      const m = document.createElement('span');
+      m.className = cls;
+      m.textContent = ' ' + message;
+      
+      el.append(t, m);
+      $(id).append(el);
+      $(id).scrollTop = $(id).scrollHeight;
+    }
+
+    function json(obj) {
+      return JSON.stringify(obj, null, 2);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    function highlight(s) {
+      try {
+        let obj = JSON.parse(s);
+        return escapeHtml(json(obj))
+          .replace(/("[^&]*?")(\s*:)/g, '<span class="key">$1</span>$2')
+          .replace(/(:\s*)("[^&]*?")/g, '$1<span class="str">$2</span>');
+      } catch {
+        return escapeHtml(s);
+      }
+    }
+
+    function showCode(id, s) {
+      $(id).classList.remove('empty');
+      $(id).innerHTML = highlight(s);
+    }
+
+    function hex(bytes) {
+      return Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function getKey() {
+      if (!crypto?.subtle) {
+        throw Error('Web Crypto API indisponível neste contexto.');
+      }
+      return key ??= await crypto.subtle.importKey(
+        'raw',
+        enc.encode(SECRET),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign', 'verify']
+      );
+    }
+
+    async function sign(message) {
+      return hex(await crypto.subtle.sign('HMAC', await getKey(), enc.encode(message)));
+    }
+
+    function setResult(kind, title, message) {
+      $('result').className = 'result-banner ' + kind;
+      $('result').innerHTML = '<strong>' + escapeHtml(title) + '</strong>' + escapeHtml(message);
+    }
+
+    function resetServer() {
+      receivedPayload = '';
+      receivedSig = '';
+      $('received').textContent = 'Aguardando envio pelo proxy...';
+      $('received').className = 'code-display empty';
+      $('receivedSig').textContent = '—';
+      $('validate').disabled = true;
+      setResult('', 'Aguardando dados', 'Envie o payload interceptado para acionar a conferência local do hash.');
+      $('serverLogs').textContent = '';
+      log('serverLogs', 'Daemon ativo em escuta no porto seguro.', 't-muted');
+    }
+
+    async function buy(index) {
+      if (busy) return;
+      busy = true;
+      document.querySelectorAll('.btn-buy').forEach(b => b.disabled = true);
+
+      try {
+        document.querySelectorAll('.product-card').forEach((p, i) => p.classList.toggle('selected', i === index));
+        const [name, value] = products[index];
+        order++;
+
+        $('clientLogs').textContent = '';
+        $('attackerLogs').textContent = '';
+        resetServer();
+
+        $('forward').disabled = true;
+        $('tamper').disabled = true;
+        $('restore').disabled = true;
+        $('editor').disabled = true;
+        $('captureBadge').className = 'status-badge';
+        $('captureBadge').textContent = 'Aguardando tráfego';
+
+        log('clientLogs', `Pedido #${order}: ${name} (R$ ${value.toFixed(2)})`);
+        log('clientLogs', 'Processando liquidação da transação...');
+        log('clientLogs', 'Saldo disponível: R$ 0,00 — Rejeitado!', 't-bad');
+
+        const payload = {
+          pedido: order,
+          valor: value,
+          status: 'recusado'
+        };
+
+        originalPayload = json(payload);
+        log('clientLogs', 'Assinando payload com HMAC-SHA256...');
+        originalSig = await sign(originalPayload);
+        log('clientLogs', 'Hash gerado: ' + originalSig.slice(0, 24) + '...', 't-good');
+        log('clientLogs', 'Notificação expedida para a rede.', 't-muted');
+
+        showCode('original', originalPayload);
+        $('editor').value = originalPayload;
+        $('editor').disabled = false;
+        $('signature').textContent = originalSig;
+
+        $('captureBadge').className = 'status-badge active-red';
+        $('captureBadge').textContent = 'Tráfego Capturado';
+
+        log('attackerLogs', 'Pacote intercetado em trânsito com sucesso.', 't-warn');
+        log('attackerLogs', 'Status original: "recusado"');
+        log('attackerLogs', 'Altere os dados para tentar enganar o servidor.');
+
+        $('forward').disabled = false;
+        $('tamper').disabled = false;
+        $('restore').disabled = false;
+      } catch (err) {
+        log('clientLogs', 'Erro crítico: ' + err.message, 't-bad');
+      } finally {
+        busy = false;
+        document.querySelectorAll('.btn-buy').forEach(b => b.disabled = false);
+      }
+    }
+
+    function tamper() {
+      try {
+        const obj = JSON.parse($('editor').value);
+        obj.status = 'aprovado';
+        $('editor').value = json(obj);
+        log('attackerLogs', 'Campo adulterado: status = "aprovado"', 't-bad');
+        log('attackerLogs', 'HMAC mantido intacto (chave privada desconhecida).', 't-warn');
+      } catch {
+        log('attackerLogs', 'Erro: Sintaxe JSON inválida.', 't-bad');
+      }
+    }
+
+    function restore() {
+      $('editor').value = originalPayload;
+      log('attackerLogs', 'Payload restaurado para os dados legítimos.', 't-good');
+    }
+
+    function forward() {
+      receivedPayload = $('editor').value;
+      receivedSig = originalSig;
+      showCode('received', receivedPayload);
+      $('receivedSig').textContent = receivedSig;
+      $('validate').disabled = false;
+      
+      setResult('', 'Payload em análise', 'Carregue em "Validar Assinatura HMAC" para verificar a integridade.');
+      log('attackerLogs', 'Pacote encaminhado para o servidor de destino.', 't-muted');
+      log('serverLogs', 'Novo webhook recebido. Pronto para verificação.');
+    }
+
+    async function validate() {
+      if (!receivedPayload) return;
+
+      try {
+        log('serverLogs', 'Calculando hash esperado com a chave partilhada...');
+        const calculated = await sign(receivedPayload);
+        
+        log('serverLogs', 'Calculado: ' + calculated.slice(0, 24) + '...');
+        log('serverLogs', 'Recebido:   ' + receivedSig.slice(0, 24) + '...');
+
+        const bytes = new Uint8Array(receivedSig.match(/../g).map(x => parseInt(x, 16)));
+        const valid = await crypto.subtle.verify('HMAC', await getKey(), bytes, enc.encode(receivedPayload));
+
+        if (!valid) {
+          log('serverLogs', 'FALHA DE INTEGRIDADE: Os hashes não coincidem!', 't-bad');
+          log('serverLogs', 'Ação: O pedido foi abortado e descartado.', 't-bad');
+          setResult('error', 'Fraude detetada (HMAC Inválido)', 'O conteúdo da mensagem foi adulterado em trânsito. O servidor descartou o pedido.');
+          return;
+        }
+
+        log('serverLogs', 'SUCESSO: A assinatura confere com o conteúdo.', 't-good');
+        
+        let data = JSON.parse(receivedPayload);
+        if (data.status === 'aprovado') {
+          log('serverLogs', 'Aviso: Notificação válida recebida como aprovada.', 't-warn');
+          setResult('ok', 'HMAC Válido', 'Mensagem legítima e íntegra (Aprovada).');
+        } else {
+          log('serverLogs', 'Notificação autêntica: Pagamento recusado por saldo.', 't-warn');
+          setResult('ok', 'HMAC Válido', 'Mensagem legítima: Pagamento confirmado como recusado.');
+        }
+      } catch (err) {
+        log('serverLogs', 'Erro de validação: ' + err.message, 't-bad');
+        setResult('error', 'Erro interno', err.message);
+      }
+    }
+
+    document.querySelectorAll('.btn-buy').forEach(b => {
+      b.addEventListener('click', () => buy(Number(b.dataset.index)));
+    });
+
+    $('tamper').addEventListener('click', tamper);
+    $('restore').addEventListener('click', restore);
+    $('forward').addEventListener('click', forward);
+    $('validate').addEventListener('click', validate);
+
+    log('clientLogs', 'Sistema iniciado. Escolha um produto acima.', 't-muted');
+    log('attackerLogs', 'Proxy em escuta passiva...', 't-muted');
+    log('serverLogs', 'Daemon ativo em escuta no porto seguro.', 't-muted');
+  })();
+  </script>
+</body>
+</html>
