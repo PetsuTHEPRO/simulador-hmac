@@ -355,6 +355,7 @@
 
     .key { color: var(--cyan); }
     .str { color: #fde047; }
+    .num { color: #c4b5fd; }
 
     .hash-box {
       font-family: 'Fira Code', monospace;
@@ -763,10 +764,19 @@
 
     function highlight(s) {
       try {
-        let obj = JSON.parse(s);
-        return escapeHtml(json(obj))
-          .replace(/("[^&]*?")(\s*:)/g, '<span class="key">$1</span>$2')
-          .replace(/(:\s*)("[^&]*?")/g, '$1<span class="str">$2</span>');
+        const formatted = json(JSON.parse(s));
+        // Colorir tokens antes de escapar cada trecho evita perder o realce do JSON.
+        const tokens = /("(?:\\.|[^"\\])*"\s*:)|("(?:\\.|[^"\\])*")|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
+        let out = '';
+        let last = 0;
+        for (const match of formatted.matchAll(tokens)) {
+          out += escapeHtml(formatted.slice(last, match.index));
+          const token = match[0];
+          const cls = match[1] ? 'key' : match[2] ? 'str' : 'num';
+          out += '<span class="' + cls + '">' + escapeHtml(token) + '</span>';
+          last = match.index + token.length;
+        }
+        return out + escapeHtml(formatted.slice(last));
       } catch {
         return escapeHtml(s);
       }
