@@ -857,6 +857,8 @@
         };
 
         originalPayload = json(payload);
+        log('clientLogs', 'Algoritmo: HMAC-SHA256', 't-good');
+        log('clientLogs', 'Chave compartilhada (apenas demonstração): ' + SECRET, 't-warn');
         log('clientLogs', 'Assinando payload com HMAC-SHA256...');
         originalSig = await sign(originalPayload);
         log('clientLogs', 'Hash gerado: ' + originalSig.slice(0, 24) + '...', 't-good');
@@ -872,6 +874,7 @@
 
         log('attackerLogs', 'Pacote intercetado em trânsito com sucesso.', 't-warn');
         log('attackerLogs', 'Status original: "recusado"');
+        log('attackerLogs', 'Payload e assinatura visíveis; chave secreta NÃO transmitida.', 't-warn');
         log('attackerLogs', 'Altere os dados para tentar enganar o servidor.');
 
         $('forward').disabled = false;
@@ -891,7 +894,7 @@
         obj.status = 'aprovado';
         $('editor').value = json(obj);
         log('attackerLogs', 'Campo adulterado: status = "aprovado"', 't-bad');
-        log('attackerLogs', 'HMAC mantido intacto (chave privada desconhecida).', 't-warn');
+        log('attackerLogs', 'HMAC mantido intacto (chave secreta desconhecida).', 't-warn');
       } catch {
         log('attackerLogs', 'Erro: Sintaxe JSON inválida.', 't-bad');
       }
@@ -918,7 +921,8 @@
       if (!receivedPayload) return;
 
       try {
-        log('serverLogs', 'Calculando hash esperado com a chave partilhada...');
+        log('serverLogs', 'Chave compartilhada (apenas demonstração): ' + SECRET, 't-warn');
+        log('serverLogs', 'Recalculando HMAC-SHA256 com a chave compartilhada...');
         const calculated = await sign(receivedPayload);
         
         log('serverLogs', 'Calculado: ' + calculated.slice(0, 24) + '...');
